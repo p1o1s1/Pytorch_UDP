@@ -1,0 +1,70 @@
+diff a/torch/csrc/distributed/c10d/GlooDeviceFactory.cpp b/torch/csrc/distributed/c10d/GlooDeviceFactory.cpp	(rejected hunks)
+@@ -65,6 +72,31 @@ C10_REGISTER_CREATOR(GlooDeviceRegistry, LINUX, makeTCPDevice);
+ C10_REGISTER_CREATOR(GlooDeviceRegistry, TCP, makeTCPDevice);
+ #endif
+ 
++#if GLOO_HAVE_TRANSPORT_UDP
++static std::shared_ptr<::gloo::transport::Device> makeUDPDevice(
++    const std::string& interfaceName,
++    const std::string& hostname) {
++  TORCH_CHECK(
++      !interfaceName.empty() || !hostname.empty(),
++      "GlooDeviceFactory::makeUDPDevice(): interface or hostname "
++      "can't be empty");
++
++  ::gloo::transport::udp::attr attr;
++  if (!interfaceName.empty()) {
++    attr.iface = interfaceName;
++  } else {
++    attr.hostname = hostname;
++  }
++  return ::gloo::transport::udp::CreateDevice(attr);
++}
++
++// Registry priority is per key identifier. We register TCP to `LINUX` for
++// the flexibility of other application to override by priority. Register
++// TCP to `TCP` for env "GLOO_DEVICE_TRANSPORT" override.
++C10_REGISTER_CREATOR(GlooDeviceRegistry, LINUX, makeTCPDevice);
++C10_REGISTER_CREATOR(GlooDeviceRegistry, TCP, makeTCPDevice);
++#endif
++
+ #if GLOO_HAVE_TRANSPORT_TCP_TLS
+ static std::string cstr_to_std_string(const char* chars) {
+   return std::string(chars != nullptr ? chars : "");
+@@ -128,31 +160,16 @@ C10_REGISTER_CREATOR(GlooDeviceRegistry, UV, makeUVDevice);
+ namespace {
+ std::shared_ptr<::gloo::transport::Device> makeGlooDevice(
+     const std::string& interfaceName,
+-    const std::string& hostName) {
+-  static auto transportName = getenv("GLOO_DEVICE_TRANSPORT");
+-  if (transportName) {
++    const std::string& hostName,
++    const std::string& transportName) {
++    
+     return GlooDeviceRegistry()->Create(transportName, interfaceName, hostName);
+   }
+-
+-#ifdef __linux__
+-  return GlooDeviceRegistry()->Create("LINUX", interfaceName, hostName);
+-#endif
+-
+-#ifdef __APPLE__
+-  return GlooDeviceRegistry()->Create("APPLE", interfaceName, hostName);
+-#endif
+-
+-#ifdef _WIN32
+-  return GlooDeviceRegistry()->Create("WIN32", interfaceName, hostName);
+-#endif
+-
+-  return nullptr;
+-}
+ } // anonymous namespace
+ 
+ std::shared_ptr<::gloo::transport::Device> GlooDeviceFactory::
+-    makeDeviceForInterface(const std::string& interfaceName) {
+-  auto device = makeGlooDevice(interfaceName, "");
++    makeDeviceForInterface(const std::string& interfaceName, const std::string& transportName) {
++  auto device = makeGlooDevice(interfaceName, "", transportName);
+   if (!device) {
+     TORCH_CHECK(false, "makeDeviceForInterface(): unsupported gloo device");
+   }
