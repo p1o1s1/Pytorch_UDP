@@ -2876,7 +2876,7 @@ def _create_process_group_wrapper(
     return wrapped_pg
 
 
-def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=None):
+def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=None, transportName='tcp'):
     """
     Creates a new distributed group.
 
@@ -2982,6 +2982,7 @@ def new_group(ranks=None, timeout=default_pg_timeout, backend=None, pg_options=N
         default_store,
         pg_options=pg_options,
         timeout=timeout,
+        transportName=transportName,
     )
 
     # Create the global rank to group rank mapping
